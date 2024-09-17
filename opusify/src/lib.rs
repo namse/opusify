@@ -11,11 +11,21 @@ mod libswresample_bindings;
 #[allow(dead_code)]
 mod minimp3_bindings;
 mod mp3;
+mod ogg;
+mod opus;
 mod resample;
 
 use anyhow::*;
 
+const OUT_SAMPLE_RATE: usize = 48000;
+
 pub async fn opusify<Input>(input: Input) -> Result<()> {
-    // mp3::mp3();
+    // mp3::decode_mp3();
+    // resample::resample(in_rx, err_tx);
     todo!()
+}
+
+pub enum Error {
+    Resample { reason: String },
+    OpusEncode { reason: &'static str },
 }

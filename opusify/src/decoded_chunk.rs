@@ -1,5 +1,5 @@
 pub struct DecodedChunk {
-    pub pcms: Vec<Vec<i16>>,
+    pub pcm: Vec<i16>,
     pub channels: usize,
-    pub hz: usize,
+    pub sample_rate: usize,
 }

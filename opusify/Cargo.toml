@@ -7,9 +7,7 @@ description = "In Audio, Out Opus"
 [dependencies]
 anyhow = { version = "1.0.89", features = ["backtrace"] }
 bytes = "1.7.1"
-futures = "0.3.30"
 opusic-sys = "0.5.1"
-rubato = "0.15.0"
 
 [build-dependencies]
 bindgen = "0.70.1"
