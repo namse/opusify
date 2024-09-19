@@ -10,6 +10,7 @@ pub fn resample(
 
     std::thread::spawn({
         move || {
+            let now = std::time::Instant::now();
             let mut samples_sum = 0;
             let result: anyhow::Result<()> = (|| {
                 let mut chunk = in_rx.recv()?;
@@ -20,8 +21,8 @@ pub fn resample(
                 let mut resampler = FftFixedIn::<f32>::new(
                     sample_rate as _,
                     OUT_SAMPLE_RATE as _,
-                    chunk.pcm.len() / 2,
-                    2,
+                    chunk.pcm.len() / channels,
+                    8,
                     channels,
                 )?;
 
@@ -81,8 +82,9 @@ pub fn resample(
             })();
 
             println!(
-                "resampler thread finished, processed {} samples",
-                samples_sum
+                "resampler thread finished, processed {} samples, elapsed: {:?}",
+                samples_sum,
+                now.elapsed()
             );
 
             if let Err(err) = result {

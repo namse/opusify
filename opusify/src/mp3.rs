@@ -5,6 +5,7 @@ pub fn decode_mp3(in_rx: mpsc::Receiver<bytes::Bytes>) -> mpsc::Receiver<Decoded
     let (out_tx, out_rx) = mpsc::channel();
 
     std::thread::spawn(move || {
+        let now = std::time::Instant::now();
         let mut sample_sum = 0;
 
         let mut mp3_decoder = unsafe {
@@ -35,7 +36,7 @@ pub fn decode_mp3(in_rx: mpsc::Receiver<bytes::Bytes>) -> mpsc::Receiver<Decoded
 
                 if samples == 0 && info.frame_bytes == 0 {
                     // not enough data
-                    return false;
+                    return true;
                 }
 
                 if samples != 0 {
@@ -67,7 +68,9 @@ pub fn decode_mp3(in_rx: mpsc::Receiver<bytes::Bytes>) -> mpsc::Receiver<Decoded
             // Note: We recommend having as many as 10 consecutive MP3 frames (~16KB) in the input buffer at a time.
             // written in https://github.com/lieff/minimp3
             while tail - head > 16 * 1024 {
-                decode_and_send(&mut mp3_input_buffer, &mut head, &mut tail);
+                if !decode_and_send(&mut mp3_input_buffer, &mut head, &mut tail) {
+                    return;
+                }
             }
 
             if head > 0 {
@@ -79,13 +82,15 @@ pub fn decode_mp3(in_rx: mpsc::Receiver<bytes::Bytes>) -> mpsc::Receiver<Decoded
         }
 
         while tail - head > 0 {
-            decode_and_send(&mut mp3_input_buffer, &mut head, &mut tail);
+            if !decode_and_send(&mut mp3_input_buffer, &mut head, &mut tail) {
+                return;
+            }
         }
 
         println!(
-            "mp3 decoder thread finished, processed {} samples, rest bytes: {}",
+            "mp3 decoder thread finished, processed {} samples, elapsed: {:?}",
             sample_sum,
-            tail - head
+            now.elapsed()
         );
     });
 
