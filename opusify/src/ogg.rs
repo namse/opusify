@@ -3,10 +3,10 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::sync::mpsc::{SendError, SyncSender};
+use std::sync::mpsc::{SendError, Sender};
 
 pub struct PacketWriter<'writer> {
-    tx: SyncSender<bytes::Bytes>,
+    tx: Sender<bytes::Bytes>,
     page_vals: HashMap<u32, CurrentPageValues<'writer>>,
 }
 
@@ -64,7 +64,7 @@ pub enum PacketWriteEndInfo {
 }
 
 impl<'writer> PacketWriter<'writer> {
-    pub fn new(tx: SyncSender<bytes::Bytes>) -> PacketWriter<'writer> {
+    pub fn new(tx: Sender<bytes::Bytes>) -> PacketWriter<'writer> {
         PacketWriter {
             tx,
             page_vals: HashMap::new(),
@@ -147,7 +147,7 @@ impl<'writer> PacketWriter<'writer> {
         Ok(())
     }
     fn write_page(
-        tx: &SyncSender<bytes::Bytes>,
+        tx: &Sender<bytes::Bytes>,
         serial: u32,
         pg: &mut CurrentPageValues,
         last_page: bool,
@@ -220,7 +220,7 @@ impl<'writer> PacketWriter<'writer> {
 
             // Now all is done, write the stuff!
             tx.send(bytes::Bytes::from(header))?;
-            tx.send(bytes::Bytes::copy_from_slice(&pg_lacing))?;
+            tx.send(bytes::Bytes::copy_from_slice(pg_lacing))?;
             for (idx, (pck, _)) in pck_data.iter().enumerate() {
                 let mut start: usize = 0;
                 if idx == 0 {
@@ -270,7 +270,7 @@ const fn get_tbl_elem(idx: u32) -> u32 {
         r = (r << 1) ^ (-(((r >> 31) & 1) as i32) as u32 & 0x04c11db7);
         i += 1;
     }
-    return r;
+    r
 }
 
 const fn lookup_array() -> [u32; 0x100] {

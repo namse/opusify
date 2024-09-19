@@ -2,30 +2,80 @@ mod decoded_chunk;
 #[allow(non_camel_case_types)]
 #[allow(non_upper_case_globals)]
 #[allow(dead_code)]
-#[allow(clippy::all)]
-#[allow(improper_ctypes)]
-#[allow(non_snake_case)]
-mod libswresample_bindings;
-#[allow(non_camel_case_types)]
-#[allow(non_upper_case_globals)]
-#[allow(dead_code)]
 mod minimp3_bindings;
 mod mp3;
 mod ogg;
 mod opus;
 mod resample;
 
-use anyhow::*;
+use anyhow::bail;
+use std::io::Read;
 
 const OUT_SAMPLE_RATE: usize = 48000;
 
-pub async fn opusify<Input>(input: Input) -> Result<()> {
-    // mp3::decode_mp3();
-    // resample::resample(in_rx, err_tx);
-    todo!()
+pub fn opusify(path: impl AsRef<std::path::Path>) -> anyhow::Result<Vec<u8>> {
+    let (bytes_tx, bytes_rx) = std::sync::mpsc::channel();
+    let (err_tx, err_rx) = std::sync::mpsc::channel();
+
+    let out_rx = mp3::decode_mp3(bytes_rx);
+    let out_rx = resample::resample(out_rx, err_tx.clone());
+    let out_rx = opus::encode_to_ogg_opus(out_rx, err_tx.clone());
+
+    let mut file = std::fs::File::open(path)?;
+    std::thread::spawn(move || {
+        let mut read_acc = 0;
+        let result: anyhow::Result<()> = (|| {
+            loop {
+                let mut buf = vec![0u8; 32 * 1024];
+                let read = file.read(&mut buf)?;
+                read_acc += read;
+                if read == 0 {
+                    break;
+                }
+                buf.truncate(read);
+                let bytes = bytes::Bytes::from(buf);
+                bytes_tx.send(bytes)?;
+            }
+
+            println!("reading thread finished, read {} bytes", read_acc);
+
+            Ok(())
+        })();
+        if let Err(error) = result {
+            let _ = err_tx.send(crate::Error::ByteRecv { error });
+        }
+    });
+
+    let mut output = Vec::new();
+    while let Ok(bytes) = out_rx.recv() {
+        output.extend_from_slice(&bytes);
+    }
+    println!("opusify finished, output size: {}", output.len());
+
+    if let Ok(error) = err_rx.try_recv() {
+        bail!(error);
+    }
+
+    Ok(output)
 }
 
+#[derive(Debug)]
 pub enum Error {
-    Resample { reason: String },
-    OpusEncode { reason: &'static str },
+    ByteRecv {
+        error: anyhow::Error,
+    },
+    Resample {
+        error: rubato::ResamplerConstructionError,
+    },
+    OpusEncode {
+        reason: &'static str,
+    },
 }
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for Error {}

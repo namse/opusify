@@ -1,6 +1,3 @@
 [submodule "minimp3"]
 	path = minimp3
 	url = https://github.com/lieff/minimp3
-[submodule "FFmpeg"]
-	path = FFmpeg
-	url = https://github.com/FFmpeg/FFmpeg
